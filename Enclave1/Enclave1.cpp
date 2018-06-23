@@ -97,10 +97,12 @@ uint32_t test_setkey(sgx_enclave_id_t src_enclave_id,
 
     target_fn_id = 0;
     msg_type = ENCLAVE_TO_ENCLAVE_CALL;
-    max_out_buff_size = 50;
+    max_out_buff_size = 300;
 
     // generate a random aeskey and iv
-    ke_status = generate_aeskey(&aeskey, aeskey_size, &iv, iv_size);
+    aeskey = (sgx_aes_gcm_128bit_key_t* )malloc(aeskey_size);
+    iv = (uint8_t *)malloc(iv_size);
+    ke_status = generate_aeskey(aeskey, aeskey_size, iv, iv_size);
     if(ke_status != SUCCESS)
     {
         return ke_status;
@@ -173,25 +175,27 @@ uint32_t test_decrypt(sgx_enclave_id_t src_enclave_id,
     char* retval;
     char* plain;
     char* cipher;
+    sgx_aes_gcm_128bit_tag_t mac;
     size_t plain_size;
     size_t cipher_size;
 
     target_fn_id = 1;
     msg_type = ENCLAVE_TO_ENCLAVE_CALL;
-    max_out_buff_size = 50;
+    max_out_buff_size = 300;
 
     plain_size = 128;
     cipher_size = plain_size;
 
     // generate a random plain
-    ke_status = generate_plain(&plain, plain_size);
+    plain = (char *)malloc(plain_size);
+    ke_status = generate_plain(plain, plain_size);
     if(ke_status != SUCCESS)
     {
         return ke_status;
     }
 
-
-    ke_status = get_cipher(aeskey, plain, plain_size, iv, iv_size, &cipher);
+    cipher = (char *)malloc(plain_size);
+    ke_status = get_cipher(aeskey, plain, plain_size, iv, iv_size, cipher, &mac);
     if(ke_status != SUCCESS)
     {
         return ke_status;
@@ -199,7 +203,7 @@ uint32_t test_decrypt(sgx_enclave_id_t src_enclave_id,
 
 
     //Marshals the input parameters for calling function setkey in Enclave2 into a input buffer
-    ke_status = marshal_input_parameters_e2_decrypt(target_fn_id, msg_type, cipher, cipher_size, &marshalled_inp_buff, &marshalled_inp_buff_len);
+    ke_status = marshal_input_parameters_e2_decrypt(target_fn_id, msg_type, cipher, cipher_size, mac, &marshalled_inp_buff, &marshalled_inp_buff_len);
     if(ke_status != SUCCESS)
     {
         return ke_status;

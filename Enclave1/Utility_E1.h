@@ -52,11 +52,11 @@ extern "C" {
 #endif
 
 
-uint32_t generate_aeskey(sgx_aes_gcm_128bit_key_t **key, size_t key_size, uint8_t **iv, size_t iv_size);
-uint32_t generate_plain(char **p, size_t p_size);
-uint32_t get_cipher(sgx_aes_gcm_128bit_key_t *key, char *p, size_t p_size, uint8_t *iv, size_t iv_size, char **c);
+uint32_t generate_aeskey(sgx_aes_gcm_128bit_key_t *key, size_t key_size, uint8_t *iv, size_t iv_size);
+uint32_t generate_plain(char *p, size_t p_size);
+uint32_t get_cipher(sgx_aes_gcm_128bit_key_t *key, char *p, size_t p_size, uint8_t *iv, size_t iv_size, char *c, sgx_aes_gcm_128bit_tag_t *mac);
 uint32_t marshal_input_parameters_e2_setkey(uint32_t target_fn_id, uint32_t msg_type, sgx_aes_gcm_128bit_key_t *key, size_t key_size, uint8_t *iv, size_t iv_size, char** marshalled_buff, size_t* marshalled_buff_len);
-uint32_t marshal_input_parameters_e2_decrypt(uint32_t target_fn_id, uint32_t msg_type, char *c, size_t c_size, char** marshalled_buff, size_t* marshalled_buff_len);
+uint32_t marshal_input_parameters_e2_decrypt(uint32_t target_fn_id, uint32_t msg_type, char *c, size_t c_size, sgx_aes_gcm_128bit_tag_t mac, char** marshalled_buff, size_t* marshalled_buff_len);
 uint32_t marshal_input_parameters_e2_encrypt(uint32_t target_fn_id, uint32_t msg_type, char *p, size_t p_size, char** marshalled_buff, size_t* marshalled_buff_len);
 
 uint32_t unmarshal_retval_and_output_parameters_e2_setkey(char* out_buff, char** retval);

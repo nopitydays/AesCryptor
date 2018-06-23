@@ -39,7 +39,7 @@
 #include "string.h"
 
 
-uint32_t generate_aeskey(sgx_aes_gcm_128bit_key_t **key, size_t key_size, uint8_t **iv, size_t iv_size)
+uint32_t generate_aeskey(sgx_aes_gcm_128bit_key_t *key, size_t key_size, uint8_t *iv, size_t iv_size)
 {
     unsigned char *temp_buff;
     temp_buff = (unsigned char*)malloc(key_size);
@@ -48,8 +48,7 @@ uint32_t generate_aeskey(sgx_aes_gcm_128bit_key_t **key, size_t key_size, uint8_
         return MALLOC_ERROR;
     
     sgx_read_rand(temp_buff, key_size);
-    *key = reinterpret_cast<sgx_aes_gcm_128bit_key_t *>(temp_buff);
-    SAFE_FREE(temp_buff);
+    memcpy(key, temp_buff, key_size);
 
     unsigned char *temp_iv_buff;
     temp_iv_buff = (unsigned char*)malloc(iv_size);
@@ -58,12 +57,13 @@ uint32_t generate_aeskey(sgx_aes_gcm_128bit_key_t **key, size_t key_size, uint8_
         return MALLOC_ERROR;
     
     sgx_read_rand(temp_iv_buff, iv_size);
-    *iv = reinterpret_cast<uint8_t *>(temp_iv_buff);
+    memcpy(iv, temp_iv_buff, iv_size);
+    SAFE_FREE(temp_buff);
     SAFE_FREE(temp_iv_buff);
     return SUCCESS;
 }
 
-uint32_t generate_plain(char **p, size_t p_size)
+uint32_t generate_plain(char *p, size_t p_size)
 {
     unsigned char *temp_buff;
     temp_buff = (unsigned char*)malloc(p_size);
@@ -71,19 +71,19 @@ uint32_t generate_plain(char **p, size_t p_size)
         return MALLOC_ERROR;
     
     sgx_read_rand(temp_buff, p_size);
-    *p = (char *)temp_buff;
+    memcpy(p, temp_buff, p_size);
     SAFE_FREE(temp_buff);
     return SUCCESS;
 }
 
 
-uint32_t get_cipher(sgx_aes_gcm_128bit_key_t *key, char *p, size_t p_size, uint8_t *iv, size_t iv_size, char **c)
+uint32_t get_cipher(sgx_aes_gcm_128bit_key_t *key, char *p, size_t p_size, uint8_t *iv, size_t iv_size, char *c, sgx_aes_gcm_128bit_tag_t *mac)
 {
     char *temp_buff;
     sgx_status_t status;
     const uint8_t* plaintext;
     uint32_t plaintext_length;
-    sgx_aes_gcm_128bit_tag_t * tag;
+    sgx_aes_gcm_128bit_tag_t temp_mac;
 
     plaintext = (const uint8_t*)(" ");
     plaintext_length = 0;
@@ -91,17 +91,19 @@ uint32_t get_cipher(sgx_aes_gcm_128bit_key_t *key, char *p, size_t p_size, uint8
     if(!temp_buff)
         return MALLOC_ERROR;
     
-    status = sgx_rijndael128GCM_encrypt((sgx_aes_gcm_128bit_key_t *)key, (uint8_t*)p, p_size,
-                reinterpret_cast<uint8_t *>(&temp_buff),
+    status = sgx_rijndael128GCM_encrypt((sgx_aes_gcm_128bit_key_t *)key, (uint8_t *)p, p_size,
+                reinterpret_cast<uint8_t *>(temp_buff),
                 reinterpret_cast<uint8_t *>(iv), iv_size, plaintext, plaintext_length,
-                tag);
+                &temp_mac);
     if(SGX_SUCCESS != status)
     {
         SAFE_FREE(temp_buff);
         return status;
     }
     
-    *c = temp_buff;
+    memcpy(c, temp_buff, p_size);
+    memcpy(mac, &temp_mac, sizeof(temp_mac));
+    SAFE_FREE(temp_mac);
     SAFE_FREE(temp_buff);
     return SUCCESS;
 }
@@ -138,18 +140,19 @@ uint32_t marshal_input_parameters_e2_setkey(uint32_t target_fn_id, uint32_t msg_
 }
 
 
-uint32_t marshal_input_parameters_e2_decrypt(uint32_t target_fn_id, uint32_t msg_type, char *c, size_t c_size, char** marshalled_buff, size_t* marshalled_buff_len)
+uint32_t marshal_input_parameters_e2_decrypt(uint32_t target_fn_id, uint32_t msg_type, char *c, size_t c_size, sgx_aes_gcm_128bit_tag_t mac, char** marshalled_buff, size_t* marshalled_buff_len)
 {
     ms_in_msg_exchange_t *ms;
     size_t param_len, ms_len;
     char *temp_buff;
         
-    param_len = c_size;
+    param_len = c_size + sizeof(sgx_aes_gcm_128bit_tag_t);
     temp_buff = (char*)malloc(param_len);
     if(!temp_buff)
         return MALLOC_ERROR;
 
     memcpy(temp_buff, c, c_size);
+    memcpy(temp_buff + c_size, mac, sizeof(sgx_aes_gcm_128bit_tag_t));
     ms_len = sizeof(ms_in_msg_exchange_t) + param_len;
     ms = (ms_in_msg_exchange_t *)malloc(ms_len);
     if(!ms)

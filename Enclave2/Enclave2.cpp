@@ -166,6 +166,9 @@ static uint32_t e2_setkey_wrapper(ms_in_msg_exchange_t *ms,
     sgx_aes_gcm_128bit_key_t *key;
     uint8_t *iv;
     uint32_t ret;
+
+    key = (sgx_aes_gcm_128bit_key_t *)malloc(global_key_size);
+    iv = (uint8_t *)malloc(global_iv_size);
     if(!ms || !resp_length)
     {
         return INVALID_PARAMETER_ERROR;
@@ -181,10 +184,10 @@ static uint32_t e2_setkey_wrapper(ms_in_msg_exchange_t *ms,
     return SUCCESS;
 }
 
-static uint32_t e2_decrypt(char *c, size_t c_size, char **p)
+static uint32_t e2_decrypt(char *c, size_t c_size, sgx_aes_gcm_128bit_tag_t mac, char **p)
 {
     ATTESTATION_STATUS ke_status = SUCCESS;
-    ke_status = get_plain(global_aeskey, c, c_size, global_iv, global_iv_size, p);
+    ke_status = get_plain(global_aeskey, c, c_size, global_iv, global_iv_size, mac, p);
     if(ke_status != SUCCESS)
     {
         return ke_status;
@@ -200,9 +203,17 @@ static uint32_t e2_decrypt_wrapper(ms_in_msg_exchange_t *ms,
 {
     UNUSED(param_lenth);
     char *c;
+    sgx_aes_gcm_128bit_tag_t mac;
     char *p;
     size_t c_size;
     uint32_t ret;
+
+    if(!ms || !resp_length)
+    {
+        return INVALID_PARAMETER_ERROR;
+    }
+    if(unmarshal_input_parameters_e2_decrypt(&c, &c_size, &mac, ms) != SUCCESS)
+        return ATTESTATION_ERROR;
 
     p = (char *)malloc(c_size);
     if (!p)
@@ -210,14 +221,7 @@ static uint32_t e2_decrypt_wrapper(ms_in_msg_exchange_t *ms,
         return MALLOC_ERROR;
     }
 
-    if(!ms || !resp_length)
-    {
-        return INVALID_PARAMETER_ERROR;
-    }
-    if(unmarshal_input_parameters_e2_decrypt(c, &c_size, ms) != SUCCESS)
-        return ATTESTATION_ERROR;
-
-    ret = e2_decrypt(c, c_size, &p);
+    ret = e2_decrypt(c, c_size, mac, &p);
     
     ret = marshal_retval_and_output_parameters_e2_decrypt(resp_buffer, resp_length, p, c_size);
 

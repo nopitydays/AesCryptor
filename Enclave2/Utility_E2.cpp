@@ -38,13 +38,12 @@
 #include "string.h"
 
 
-uint32_t get_plain(sgx_aes_gcm_128bit_key_t *key, char *c, size_t c_size, uint8_t *iv, size_t iv_size, char **p)
+uint32_t get_plain(sgx_aes_gcm_128bit_key_t *key, char *c, size_t c_size, uint8_t *iv, size_t iv_size, sgx_aes_gcm_128bit_tag_t mac, char **p)
 {
     char *temp_buff;
     sgx_status_t status;
     const uint8_t* plaintext;
     uint32_t plaintext_length;
-    sgx_aes_gcm_128bit_tag_t * tag;
 
     plaintext = (const uint8_t*)(" ");
     plaintext_length = 0;
@@ -53,9 +52,9 @@ uint32_t get_plain(sgx_aes_gcm_128bit_key_t *key, char *c, size_t c_size, uint8_
         return MALLOC_ERROR;
     
     status = sgx_rijndael128GCM_decrypt((sgx_aes_gcm_128bit_key_t *)key, (uint8_t*)c, c_size,
-                reinterpret_cast<uint8_t *>(&temp_buff),
+                reinterpret_cast<uint8_t *>(temp_buff),
                 reinterpret_cast<uint8_t *>(iv), iv_size, plaintext, plaintext_length,
-                tag);
+                &mac);
     if(SGX_SUCCESS != status)
     {
         SAFE_FREE(temp_buff);
@@ -116,12 +115,9 @@ uint32_t unmarshal_input_parameters_e2_setkey(sgx_aes_gcm_128bit_key_t* key, uin
 
     if(len < key_size)
         return ATTESTATION_ERROR;
-    
-    key = (sgx_aes_gcm_128bit_key_t *)malloc(sizeof(key_size));
+
     if(!key)
         return MALLOC_ERROR;   
-
-    iv = (uint8_t *)malloc(sizeof(len - key_size));
     if (!iv)
         return MALLOC_ERROR;
 
@@ -132,7 +128,7 @@ uint32_t unmarshal_input_parameters_e2_setkey(sgx_aes_gcm_128bit_key_t* key, uin
 }
 
 
-uint32_t unmarshal_input_parameters_e2_decrypt(char* c, size_t* c_size, ms_in_msg_exchange_t* ms)
+uint32_t unmarshal_input_parameters_e2_decrypt(char** c, size_t* c_size, sgx_aes_gcm_128bit_tag_t *mac, ms_in_msg_exchange_t* ms)
 {
     char* buff;
     size_t len;
@@ -143,13 +139,14 @@ uint32_t unmarshal_input_parameters_e2_decrypt(char* c, size_t* c_size, ms_in_ms
     buff = ms->inparam_buff;
     len = ms->inparam_buff_len;
 
-    c = (char *)malloc(len);
+    *c = (char *)malloc(len - sizeof(sgx_aes_gcm_128bit_tag_t));
     if(!c)
         return MALLOC_ERROR;   
 
 
-    memcpy(c, buff, len);
-    *c_size = len;
+    memcpy(*c, buff, len - sizeof(sgx_aes_gcm_128bit_tag_t));
+    memcpy(mac, buff + len - sizeof(sgx_aes_gcm_128bit_tag_t), sizeof(sgx_aes_gcm_128bit_tag_t));
+    *c_size = len - sizeof(sgx_aes_gcm_128bit_tag_t);
 
     return SUCCESS;
 }
