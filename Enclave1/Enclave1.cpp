@@ -97,7 +97,7 @@ uint32_t test_setkey(sgx_enclave_id_t src_enclave_id,
 
     target_fn_id = 0;
     msg_type = ENCLAVE_TO_ENCLAVE_CALL;
-    max_out_buff_size = 300;
+    max_out_buff_size = 50;
 
     // generate a random aeskey and iv
     aeskey = (sgx_aes_gcm_128bit_key_t* )malloc(aeskey_size);
@@ -250,89 +250,93 @@ uint32_t test_decrypt(sgx_enclave_id_t src_enclave_id,
 }
 
 
-// uint32_t test_encrypt(sgx_enclave_id_t src_enclave_id,
-//                                           sgx_enclave_id_t dest_enclave_id)
-// {
-//     ATTESTATION_STATUS ke_status = SUCCESS;
-//     uint32_t target_fn_id, msg_type;
-//     char* marshalled_inp_buff;
-//     size_t marshalled_inp_buff_len;
-//     char* out_buff;
-//     size_t out_buff_len;
-//     dh_session_t *dest_session_info;
-//     size_t max_out_buff_size;
-//     char* retval;
-//     char* plain;
-//     char* cipher;
-//     size_t plain_size;
+uint32_t test_encrypt(sgx_enclave_id_t src_enclave_id,
+                                          sgx_enclave_id_t dest_enclave_id)
+{
+    ATTESTATION_STATUS ke_status = SUCCESS;
+    uint32_t target_fn_id, msg_type;
+    char* marshalled_inp_buff;
+    size_t marshalled_inp_buff_len;
+    char* out_buff;
+    size_t out_buff_len;
+    dh_session_t *dest_session_info;
+    size_t max_out_buff_size;
+    char* retval;
+    char* plain;
+    char* cipher;
+    sgx_aes_gcm_128bit_tag_t mac;
+    size_t plain_size;
+    size_t cipher_size;
 
-//     target_fn_id = ;
-//     msg_type = ENCLAVE_TO_ENCLAVE_CALL;
-//     max_out_buff_size = 50;
+    target_fn_id = 2;
+    msg_type = ENCLAVE_TO_ENCLAVE_CALL;
+    max_out_buff_size = 300;
 
-//     plain_size = 128
+    plain_size = 128;
+    cipher_size = plain_size;
 
-//     // generate a random plain
-//     ke_status = generate_plain(&plain, plain_size);
-//     if(ke_status != SUCCESS)
-//     {
-//         return ke_status;
-//     }
+    // generate a random plain
+    plain = (char *)malloc(plain_size);
+    ke_status = generate_plain(plain, plain_size);
+    if(ke_status != SUCCESS)
+    {
+        return ke_status;
+    }
 
-
-//     ke_status = get_cipher(aes_key, plain, plain_size, &cipher);
-//     if(ke_status != SUCCESS)
-//     {
-//         return ke_status;
-//     }
-
-
-//     //Marshals the input parameters for calling function setkey in Enclave2 into a input buffer
-//     ke_status = marshal_input_parameters_e2_encrypt(target_fn_id, msg_type, plain, plain_size, &marshalled_inp_buff, &marshalled_inp_buff_len);
-//     if(ke_status != SUCCESS)
-//     {
-//         return ke_status;
-//     }
+    cipher = (char *)malloc(plain_size);
+    ke_status = get_cipher(aeskey, plain, plain_size, iv, iv_size, cipher, &mac);
+    if(ke_status != SUCCESS)
+    {
+        return ke_status;
+    }
 
 
-//     //Search the map for the session information associated with the destination enclave id of Enclave2 passed in
-//     std::map<sgx_enclave_id_t, dh_session_t>::iterator it = g_src_session_info_map.find(dest_enclave_id);
-//     if(it != g_src_session_info_map.end())
-//     {
-//           dest_session_info = &it->second;
-//     }
-//     else
-//     {
-//         SAFE_FREE(marshalled_inp_buff);
-//         return INVALID_SESSION;
-//     }
-
-//     //Core Reference Code function
-//     ke_status = send_request_receive_response(src_enclave_id, dest_enclave_id, dest_session_info, marshalled_inp_buff,
-//                                             marshalled_inp_buff_len, max_out_buff_size, &out_buff, &out_buff_len);
+    //Marshals the input parameters for calling function setkey in Enclave2 into a input buffer
+    ke_status = marshal_input_parameters_e2_encrypt(target_fn_id, msg_type, plain, plain_size, &marshalled_inp_buff, &marshalled_inp_buff_len);
+    if(ke_status != SUCCESS)
+    {
+        return ke_status;
+    }
 
 
-//     if(ke_status != SUCCESS)
-//     {
-//         SAFE_FREE(marshalled_inp_buff);
-//         SAFE_FREE(out_buff);
-//         return ke_status;
-//     }
+    //Search the map for the session information associated with the destination enclave id of Enclave2 passed in
+    std::map<sgx_enclave_id_t, dh_session_t>::iterator it = g_src_session_info_map.find(dest_enclave_id);
+    if(it != g_src_session_info_map.end())
+    {
+          dest_session_info = &it->second;
+    }
+    else
+    {
+        SAFE_FREE(marshalled_inp_buff);
+        return INVALID_SESSION;
+    }
 
-//     //Un-marshal the return value and output parameters from setkey of Enclave 2
-//     ke_status = unmarshal_retval_and_output_parameters_e2_encrypt(cipher, out_buff, &retval);
-//     if(ke_status != SUCCESS)
-//     {
-//         SAFE_FREE(marshalled_inp_buff);
-//         SAFE_FREE(out_buff);
-//         return ke_status;
-//     }
+    //Core Reference Code function
+    ke_status = send_request_receive_response(src_enclave_id, dest_enclave_id, dest_session_info, marshalled_inp_buff,
+                                            marshalled_inp_buff_len, max_out_buff_size, &out_buff, &out_buff_len);
 
-//     SAFE_FREE(marshalled_inp_buff);
-//     SAFE_FREE(out_buff);
-//     SAFE_FREE(retval);
-//     return SUCCESS;    
-// }
+
+    if(ke_status != SUCCESS)
+    {
+        SAFE_FREE(marshalled_inp_buff);
+        SAFE_FREE(out_buff);
+        return ke_status;
+    }
+
+    //Un-marshal the return value and output parameters from decrypt of Enclave 2
+    ke_status = unmarshal_retval_and_output_parameters_e2_encrypt(cipher, out_buff, &retval);
+    if(ke_status != SUCCESS)
+    {
+        SAFE_FREE(marshalled_inp_buff);
+        SAFE_FREE(out_buff);
+        return ke_status;
+    }
+
+    SAFE_FREE(marshalled_inp_buff);
+    SAFE_FREE(out_buff);
+    SAFE_FREE(retval);
+    return SUCCESS;       
+}
 
 
 

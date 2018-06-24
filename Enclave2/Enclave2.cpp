@@ -50,18 +50,18 @@ std::map<sgx_enclave_id_t, dh_session_t>g_src_session_info_map;
 
 static uint32_t e2_setkey_wrapper(ms_in_msg_exchange_t *ms, size_t param_lenth, char** resp_buffer, size_t* resp_length);
 static uint32_t e2_decrypt_wrapper(ms_in_msg_exchange_t *ms, size_t param_lenth, char** resp_buffer, size_t* resp_length);
-//static uint32_t e2_encrypt_wrapper(ms_in_msg_exchange_t *ms, size_t param_lenth, char** resp_buffer, size_t* resp_length);
+static uint32_t e2_encrypt_wrapper(ms_in_msg_exchange_t *ms, size_t param_lenth, char** resp_buffer, size_t* resp_length);
 
 //Function pointer table containing the list of functions that the enclave exposes
 const struct {
     size_t num_funcs;
-    const void* table[2];
+    const void* table[3];
 } func_table = {
-    2,
+    3,
     {
         (const void*)e2_setkey_wrapper,
         (const void*)e2_decrypt_wrapper,
-        //(const void*)e2_encrypt_wrapper,
+        (const void*)e2_encrypt_wrapper,
     }
 };
 
@@ -184,7 +184,7 @@ static uint32_t e2_setkey_wrapper(ms_in_msg_exchange_t *ms,
     return SUCCESS;
 }
 
-static uint32_t e2_decrypt(char *c, size_t c_size, sgx_aes_gcm_128bit_tag_t mac, char **p)
+static uint32_t e2_decrypt(char *c, size_t c_size, sgx_aes_gcm_128bit_tag_t *mac, char *p)
 {
     ATTESTATION_STATUS ke_status = SUCCESS;
     ke_status = get_plain(global_aeskey, c, c_size, global_iv, global_iv_size, mac, p);
@@ -221,7 +221,7 @@ static uint32_t e2_decrypt_wrapper(ms_in_msg_exchange_t *ms,
         return MALLOC_ERROR;
     }
 
-    ret = e2_decrypt(c, c_size, mac, &p);
+    ret = e2_decrypt(c, c_size, &mac, p);
     
     ret = marshal_retval_and_output_parameters_e2_decrypt(resp_buffer, resp_length, p, c_size);
 
@@ -234,33 +234,51 @@ static uint32_t e2_decrypt_wrapper(ms_in_msg_exchange_t *ms,
     return SUCCESS;
 }
 
-// static uint32_t e2_encrypt(char *key, char *iv)
-// {
-//     global_aeskey = key;
-//     global_iv = iv;
-//     return SUCCESS;
-// }
+static uint32_t e2_encrypt(char *p, size_t p_size, char *c)
+{
+    ATTESTATION_STATUS ke_status = SUCCESS;
+    ke_status = get_cipher(global_aeskey, p, p_size, global_iv, global_iv_size, c);
+    if(ke_status != SUCCESS)
+    {
+        return ke_status;
+    }
+    return SUCCESS;
+}
 
-// //Function which is executed on request from the source enclave
-// static uint32_t e2_encrypt_wrapper(ms_in_msg_exchange_t *ms,
-//                     size_t param_lenth,
-//                     char** resp_buffer,
-//                     size_t* resp_length)
-// {
-//     UNUSED(param_lenth);
-//     char *key, *iv;
-//     uint32_t ret;
-//     if(!ms || !resp_length)
-//     {
-//         return INVALID_PARAMETER_ERROR;
-//     }
-//     if(unmarshal_input_parameters_e2_setkey(key, iv, ms) != SUCCESS)
-//         return ATTESTATION_ERROR;
+//Function which is executed on request from the source enclave
+static uint32_t e2_encrypt_wrapper(ms_in_msg_exchange_t *ms,
+                    size_t param_lenth,
+                    char** resp_buffer,
+                    size_t* resp_length)
+{
+    UNUSED(param_lenth);
+    char *c;
+    char *p;
+    size_t p_size;
+    uint32_t ret;
 
-//     ret = e2_setkey(key, iv);
+    if(!ms || !resp_length)
+    {
+        return INVALID_PARAMETER_ERROR;
+    }
+    if(unmarshal_input_parameters_e2_encrypt(&p, &p_size, ms) != SUCCESS)
+        return ATTESTATION_ERROR;
 
-//     if(marshal_retval_and_output_parameters_e2_setkey(resp_buffer, resp_length, ret) != SUCCESS )
-//         return MALLOC_ERROR; //can set resp buffer to null here
+    c = (char *)malloc(p_size);
+    if (!c)
+    {
+        return MALLOC_ERROR;
+    }
 
-//     return SUCCESS;
-// }
+    ret = e2_encrypt(p, p_size, c);
+    
+    ret = marshal_retval_and_output_parameters_e2_encrypt(resp_buffer, resp_length, c, p_size);
+
+    if( ret != SUCCESS )
+    {
+        if (ret != ATTESTATION_ERROR)
+            return MALLOC_ERROR; //can set resp buffer to null here
+        return ret;
+    }
+    return SUCCESS;
+}

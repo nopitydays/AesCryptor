@@ -47,7 +47,10 @@ uint32_t unmarshal_input_parameters_e2_setkey(sgx_aes_gcm_128bit_key_t* key, uin
 uint32_t marshal_retval_and_output_parameters_e2_setkey(char** resp_buffer, size_t* resp_length, uint32_t retval);
 uint32_t unmarshal_input_parameters_e2_decrypt(char** c, size_t* c_size, sgx_aes_gcm_128bit_tag_t *mac, ms_in_msg_exchange_t* ms);
 uint32_t marshal_retval_and_output_parameters_e2_decrypt(char** resp_buffer, size_t* resp_length, char *p, size_t p_size);
-uint32_t get_plain(sgx_aes_gcm_128bit_key_t *key, char *c, size_t c_size, uint8_t *iv, size_t iv_size, sgx_aes_gcm_128bit_tag_t mac, char **p);
+uint32_t unmarshal_input_parameters_e2_encrypt(char** p, size_t* p_size, ms_in_msg_exchange_t* ms);
+uint32_t marshal_retval_and_output_parameters_e2_encrypt(char** resp_buffer, size_t* resp_length, char *c, size_t c_size);
+uint32_t get_plain(sgx_aes_gcm_128bit_key_t *key, char *c, size_t c_size, uint8_t *iv, size_t iv_size, sgx_aes_gcm_128bit_tag_t *mac, char *p);
+uint32_t get_cipher(sgx_aes_gcm_128bit_key_t *key, char *p, size_t p_size, uint8_t *iv, size_t iv_size, char *c);
 
 #ifdef __cplusplus
  }

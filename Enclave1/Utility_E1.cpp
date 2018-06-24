@@ -102,8 +102,7 @@ uint32_t get_cipher(sgx_aes_gcm_128bit_key_t *key, char *p, size_t p_size, uint8
     }
     
     memcpy(c, temp_buff, p_size);
-    memcpy(mac, &temp_mac, sizeof(temp_mac));
-    SAFE_FREE(temp_mac);
+    memcpy(mac, &temp_mac, sizeof(sgx_aes_gcm_128bit_tag_t));
     SAFE_FREE(temp_buff);
     return SUCCESS;
 }
@@ -222,7 +221,7 @@ uint32_t unmarshal_retval_and_output_parameters_e2_decrypt(char *p, char* out_bu
 {
     size_t retval_len;
     ms_out_msg_exchange_t *ms;
-    if(!out_buff)
+    if(!out_buff||!p)
         return INVALID_PARAMETER_ERROR;
     ms = (ms_out_msg_exchange_t *)out_buff;
     retval_len = ms->retval_len;
@@ -232,7 +231,7 @@ uint32_t unmarshal_retval_and_output_parameters_e2_decrypt(char *p, char* out_bu
 
     memcpy(*retval, ms->ret_outparam_buff, retval_len);
 
-    if (strcmp(p, out_buff))
+    if (memcmp(p, *retval, retval_len))
         return ATTESTATION_ERROR;
 
     return SUCCESS;
@@ -243,7 +242,7 @@ uint32_t unmarshal_retval_and_output_parameters_e2_encrypt(char *c, char* out_bu
 {
     size_t retval_len;
     ms_out_msg_exchange_t *ms;
-    if(!out_buff)
+    if(!out_buff||!c)
         return INVALID_PARAMETER_ERROR;
     ms = (ms_out_msg_exchange_t *)out_buff;
     retval_len = ms->retval_len;
@@ -252,8 +251,8 @@ uint32_t unmarshal_retval_and_output_parameters_e2_encrypt(char *c, char* out_bu
         return MALLOC_ERROR;
 
     memcpy(*retval, ms->ret_outparam_buff, retval_len);
-    
-    if (strcmp(c, out_buff))
+
+    if (memcmp(c, *retval, retval_len))
         return ATTESTATION_ERROR;
 
     return SUCCESS;

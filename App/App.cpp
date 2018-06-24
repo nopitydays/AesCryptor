@@ -151,12 +151,11 @@ int _tmain(int argc, _TCHAR* argv[])
             {
                 if (ret_status!=0)
                 {
-                    printf("\n[!] function setKey check failed! ");
+                    printf("\n    [!] function setKey check failed! \n");
                     test_res = false;
                     break;
                 }
             }
-            printf("\nsetKey works!\n");
             status = Enclave1_test_decrypt(e1_enclave_id, &ret_status, e1_enclave_id, e2_enclave_id);
             if (status!=SGX_SUCCESS)
             {
@@ -167,41 +166,26 @@ int _tmain(int argc, _TCHAR* argv[])
             {
                 if (ret_status!=0)
                 {
-                    printf("[!] function decrypt check failed! ");
+                    printf("\n    [!] function decrypt check failed! \n");
                     test_res = false;
                     break;
                 }
             }
-            // status = Enclave1_test_encrypt(e1_enclave_id, &ret_status, e1_enclave_id, e2_enclave_id);
-            // if (status!=SGX_SUCCESS)
-            // {
-            //     printf("Enclave1_test_encrypt Ecall failed: Error code is %x", status);
-            //     goto destroy;
-            // }
-            // else
-            // {
-            //     if (ret_status!=0)
-            //     {
-            //         printf("[!] function encrypt check failed! ");
-            //         test_res = false;
-            //         break;
-            //     }
-            // }
-            // status = Enclave1_test_freekey();
-            // if (status!=SGX_SUCCESS)
-            // {
-            //     printf("Enclave1_test_encrypt Ecall failed: Error code is %x", status);
-            //     goto destroy;
-            // }
-            // else
-            // {
-            //     if (ret_status!=0)
-            //     {
-            //         printf("[!] function freekey check failed! ");
-            //         test_res = false;
-            //         break;
-            //     }
-            // }
+            status = Enclave1_test_encrypt(e1_enclave_id, &ret_status, e1_enclave_id, e2_enclave_id);
+            if (status!=SGX_SUCCESS)
+            {
+                printf("Enclave1_test_encrypt Ecall failed: Error code is %x", status);
+                goto destroy;
+            }
+            else
+            {
+                if (ret_status!=0)
+                {
+                    printf("\n    [!] function encrypt check failed! \n");
+                    test_res = false;
+                    break;
+                }
+            }
             printf("\n    cryptor works in this round !\n");
             test_times --;
         }

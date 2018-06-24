@@ -38,33 +38,66 @@
 #include "string.h"
 
 
-uint32_t get_plain(sgx_aes_gcm_128bit_key_t *key, char *c, size_t c_size, uint8_t *iv, size_t iv_size, sgx_aes_gcm_128bit_tag_t mac, char **p)
+uint32_t get_plain(sgx_aes_gcm_128bit_key_t *key, char *c, size_t c_size, uint8_t *iv, size_t iv_size, sgx_aes_gcm_128bit_tag_t *mac, char *p)
 {
     char *temp_buff;
     sgx_status_t status;
     const uint8_t* plaintext;
     uint32_t plaintext_length;
+    sgx_aes_gcm_128bit_tag_t temp_mac;
 
     plaintext = (const uint8_t*)(" ");
     plaintext_length = 0;
     temp_buff = (char*)malloc(c_size);
+    memcpy(&temp_mac, mac, sizeof(sgx_aes_gcm_128bit_tag_t));
     if(!temp_buff)
         return MALLOC_ERROR;
     
     status = sgx_rijndael128GCM_decrypt((sgx_aes_gcm_128bit_key_t *)key, (uint8_t*)c, c_size,
                 reinterpret_cast<uint8_t *>(temp_buff),
                 reinterpret_cast<uint8_t *>(iv), iv_size, plaintext, plaintext_length,
-                &mac);
+                &temp_mac);
     if(SGX_SUCCESS != status)
     {
         SAFE_FREE(temp_buff);
         return status;
     }
     
-    *p = temp_buff;
+    memcpy(p, temp_buff, c_size);
     SAFE_FREE(temp_buff);
     return SUCCESS;
 }
+
+
+uint32_t get_cipher(sgx_aes_gcm_128bit_key_t *key, char *p, size_t p_size, uint8_t *iv, size_t iv_size, char *c)
+{
+    char *temp_buff;
+    sgx_status_t status;
+    const uint8_t* plaintext;
+    uint32_t plaintext_length;
+    sgx_aes_gcm_128bit_tag_t temp_mac;
+
+    plaintext = (const uint8_t*)(" ");
+    plaintext_length = 0;
+    temp_buff = (char*)malloc(p_size);
+    if(!temp_buff)
+        return MALLOC_ERROR;
+    
+    status = sgx_rijndael128GCM_encrypt((sgx_aes_gcm_128bit_key_t *)key, (uint8_t*)p, p_size,
+                reinterpret_cast<uint8_t *>(temp_buff),
+                reinterpret_cast<uint8_t *>(iv), iv_size, plaintext, plaintext_length,
+                &temp_mac);
+    if(SGX_SUCCESS != status)
+    {
+        SAFE_FREE(temp_buff);
+        return status;
+    }
+    
+    memcpy(c, temp_buff, p_size);
+    SAFE_FREE(temp_buff);
+    return SUCCESS;
+}
+
 
 
 uint32_t marshal_retval_and_output_parameters_e2_setkey(char** resp_buffer, size_t* resp_length, uint32_t retval)
@@ -188,3 +221,62 @@ uint32_t marshal_retval_and_output_parameters_e2_decrypt(char** resp_buffer, siz
     return SUCCESS;
 }
 
+
+uint32_t unmarshal_input_parameters_e2_encrypt(char** p, size_t* p_size, ms_in_msg_exchange_t* ms)
+{
+    char* buff;
+    size_t len;
+    
+    if(!p || !p_size || !ms)
+        return INVALID_PARAMETER_ERROR;
+
+    buff = ms->inparam_buff;
+    len = ms->inparam_buff_len;
+
+    *p = (char *)malloc(len);
+    if(!p)
+        return MALLOC_ERROR;   
+
+
+    memcpy(*p, buff, len);
+    *p_size = len;
+
+    return SUCCESS;
+}
+
+
+uint32_t marshal_retval_and_output_parameters_e2_encrypt(char** resp_buffer, size_t* resp_length, char *c, size_t c_size)
+{
+    ms_out_msg_exchange_t *ms;
+    size_t ret_param_len, ms_len;
+    char *temp_buff;
+    size_t retval_len;
+
+    if (!c||!c_size)
+        return ATTESTATION_ERROR;
+
+    if(!resp_length)
+        return INVALID_PARAMETER_ERROR;
+    retval_len = c_size;
+    ret_param_len = retval_len; //no out parameters
+    temp_buff = (char*)malloc(ret_param_len);
+    if(!temp_buff)
+        return MALLOC_ERROR;
+
+    memcpy(temp_buff, c, c_size);
+    //memset(temp_buff, 0, retval_len);
+    ms_len = sizeof(ms_out_msg_exchange_t) + ret_param_len;
+    ms = (ms_out_msg_exchange_t *)malloc(ms_len);
+    if(!ms)
+    {
+        SAFE_FREE(temp_buff);
+        return MALLOC_ERROR;
+    }
+    ms->retval_len = (uint32_t)retval_len;
+    ms->ret_outparam_buff_len = (uint32_t)ret_param_len;
+    memcpy(&ms->ret_outparam_buff, temp_buff, ret_param_len);
+    *resp_buffer = (char*)ms;
+    *resp_length = ms_len;
+    SAFE_FREE(temp_buff);
+    return SUCCESS;
+}
